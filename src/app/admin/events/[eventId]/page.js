@@ -67,7 +67,7 @@ export default async function EventPage({ params }) {
   return (
     <EventDetail
       event={JSON.parse(JSON.stringify(event))}
-      leaderboards={sessionLeaderboards}
+      leaderboards={JSON.parse(JSON.stringify(sessionLeaderboards))}
       aggregate={aggregateLeaderboard}
       quizzes={JSON.parse(JSON.stringify(quizzes))}
     />

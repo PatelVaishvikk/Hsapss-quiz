@@ -81,6 +81,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const gamePin = searchParams.get('pin');
+    const role = searchParams.get('role');
 
     if (!gamePin) {
       return NextResponse.json({ success: false, error: 'Game pin is required' }, { status: 400 });
@@ -90,6 +91,20 @@ export async function GET(request) {
 
     if (!session) {
       return NextResponse.json({ success: false, error: 'Game not found' }, { status: 404 });
+    }
+
+    /* If not a host request, strip correctAnswer from questions so players can't cheat */
+    if (role !== 'host') {
+      const sessionObj = session.toObject();
+      if (sessionObj.quizId?.questions) {
+        sessionObj.quizId.questions = sessionObj.quizId.questions.map((q) => ({
+          question: q.question,
+          options: q.options,
+          timeLimit: q.timeLimit,
+          _id: q._id,
+        }));
+      }
+      return NextResponse.json({ success: true, session: sessionObj });
     }
 
     return NextResponse.json({ success: true, session });

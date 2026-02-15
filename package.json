@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "html5-qrcode": "^2.3.8",
     "mongodb": "^7.0.0",
     "mongoose": "^8.19.3",
     "next": "16.0.3",
     "next-auth": "^4.24.13",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "socket.io": "^4.8.1",
