@@ -13,7 +13,7 @@
     "html5-qrcode": "^2.3.8",
     "mongodb": "^7.0.0",
     "mongoose": "^8.19.3",
-    "next": "16.0.3",
+    "next": "^16.1.6",
     "next-auth": "^4.24.13",
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
