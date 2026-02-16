@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GameQRCode from './GameQRCode';
 
 const optionClasses = ['option-a', 'option-b', 'option-c', 'option-d'];
@@ -28,11 +28,35 @@ export default function HostView({ gamePin }) {
     }
   }, [gamePin]);
 
+  /* Lightweight status check — only fetch full session if something changed */
+  const prevVersionRef = useRef(null);
+  const pollTimerRef = useRef(null);
+
+  const fetchStatus = useCallback(async () => {
+    if (!gamePin) return;
+    try {
+      const res = await fetch(`/api/games/status?pin=${gamePin}`);
+      const data = await res.json();
+      if (!data.success) return;
+      if (data.version === prevVersionRef.current && session) return;
+      prevVersionRef.current = data.version;
+      // Something changed — fetch full session
+      await fetchSession();
+    } catch {
+      // Silent fail — will retry next poll
+    }
+  }, [gamePin, session, fetchSession]);
+
   useEffect(() => {
-    fetchSession();
-    const interval = setInterval(fetchSession, 4000);
-    return () => clearInterval(interval);
+    fetchSession(); // initial full fetch
   }, [fetchSession]);
+
+  useEffect(() => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    const interval = session?.status === 'active' ? 6000 : 10000;
+    pollTimerRef.current = setInterval(fetchStatus, interval);
+    return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
+  }, [session?.status, fetchStatus]);
 
   const handleAction = async (action) => {
     if (!gamePin) return;

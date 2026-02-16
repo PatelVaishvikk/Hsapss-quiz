@@ -104,7 +104,10 @@ export async function GET(request) {
           _id: q._id,
         }));
       }
-      return NextResponse.json({ success: true, session: sessionObj });
+      const playerRes = NextResponse.json({ success: true, session: sessionObj });
+      // Edge cache for 2s — all players get the same response within this window
+      playerRes.headers.set('Cache-Control', 'public, s-maxage=2, stale-while-revalidate=5');
+      return playerRes;
     }
 
     return NextResponse.json({ success: true, session });

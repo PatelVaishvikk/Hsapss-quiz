@@ -21,7 +21,6 @@ const GameSessionSchema = new mongoose.Schema({
   players: [PlayerSchema],
   currentQuestion: { type: Number, default: 0 },
   status: { type: String, enum: ['waiting', 'active', 'finished'], default: 'waiting' },
-  createdAt: { type: Date, default: Date.now },
-});
+}, { timestamps: true });
 
 export default mongoose.models.GameSession || mongoose.model('GameSession', GameSessionSchema);

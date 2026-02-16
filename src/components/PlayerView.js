@@ -16,6 +16,14 @@ function OptionIcon({ index, size = 20 }) {
 const optionClasses = ['option-a', 'option-b', 'option-c', 'option-d'];
 const labels = ['A', 'B', 'C', 'D'];
 
+/* ─── Polling intervals (ms) — adaptive by game state ─── */
+const POLL_INTERVALS = {
+  waiting: 8000,     // Nothing changes fast during waiting
+  active: 5000,      // Need to detect question changes
+  answered: 10000,   // Already answered — just wait for next question
+  finished: 0,       // Stop polling entirely
+};
+
 /* ─── Circular countdown timer ─── */
 function CountdownTimer({ timeLimit, onExpired }) {
   const [remaining, setRemaining] = useState(timeLimit);
@@ -97,7 +105,37 @@ export default function PlayerView({ gamePin, initialName = '' }) {
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const prevQuestionRef = useRef(null);
+  const prevVersionRef = useRef(null);
+  const pollTimerRef = useRef(null);
 
+  /* ─── Lightweight status poll ─── 
+   * Only fetches ~100 bytes { status, currentQuestion, playerCount, version }
+   * If version changed → fetch full session. Otherwise skip the heavy call.
+   */
+  const fetchStatus = useCallback(async () => {
+    if (!gamePin) return;
+    try {
+      const res = await fetch(`/api/games/status?pin=${gamePin}`);
+      const data = await res.json();
+      if (!data.success) return;
+
+      // If nothing changed since last poll, skip full fetch
+      if (data.version === prevVersionRef.current && session) return;
+      prevVersionRef.current = data.version;
+
+      // Something changed — fetch the full session
+      const fullRes = await fetch(`/api/games?pin=${gamePin}`);
+      const fullData = await fullRes.json();
+      if (fullData.success) {
+        setSession(fullData.session);
+        setError('');
+      }
+    } catch {
+      // Silent fail — will retry next poll
+    }
+  }, [gamePin, session]);
+
+  /* Full session fetch (used for initial load + after mutations) */
   const fetchSession = useCallback(async () => {
     if (!gamePin) return;
     try {
@@ -105,17 +143,46 @@ export default function PlayerView({ gamePin, initialName = '' }) {
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to load game');
       setSession(data.session);
+      prevVersionRef.current = Date.now(); // Reset version tracking
       setError('');
     } catch (fetchError) {
       setError(fetchError.message);
     }
   }, [gamePin]);
 
+  /* ─── Adaptive polling ─── */
   useEffect(() => {
+    // Initial full fetch
     fetchSession();
-    const interval = setInterval(fetchSession, 4000);
-    return () => clearInterval(interval);
   }, [fetchSession]);
+
+  useEffect(() => {
+    // Determine the right interval based on current state
+    let interval;
+    if (!joined) {
+      interval = POLL_INTERVALS.waiting;
+    } else if (session?.status === 'finished') {
+      interval = POLL_INTERVALS.finished; // stop polling
+    } else if (showResult || selectedAnswer !== null) {
+      interval = POLL_INTERVALS.answered; // already answered this question
+    } else if (session?.status === 'active') {
+      interval = POLL_INTERVALS.active;
+    } else {
+      interval = POLL_INTERVALS.waiting;
+    }
+
+    // Clear any existing timer
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+
+    // Set new timer (0 = don't poll)
+    if (interval > 0) {
+      pollTimerRef.current = setInterval(fetchStatus, interval);
+    }
+
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [joined, session?.status, showResult, selectedAnswer, fetchStatus]);
 
   /* Reset selection when question changes */
   useEffect(() => {
